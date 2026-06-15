@@ -53,13 +53,15 @@ DataForSEO). It's a single new file plus a branch in `getProvider()`.
 ```
 src/
   app/
-    page.tsx              Dashboard (location/keyword/size + heatmap)
+    page.tsx              Dashboard (location/keyword/size + heatmap + library)
     api/scan/route.ts     POST — run a geo-grid scan
+    api/scans/route.ts    GET — scan history (summaries; filter by location/keyword)
+    api/scans/[id]/route.ts GET — one full saved scan (with points)
     api/locations/route.ts GET — seeded locations
   lib/
     grid.ts               Build grid coordinates
     scan.ts               Orchestrate a scan (size^2 lookups, batched)
-    store.ts              Persist scans (JSON file; swap for Postgres)
+    store.ts              Persist + read scans (JSON file; swap for Postgres)
     ranking/
       provider.ts         The RankingProvider interface
       mock.ts             Deterministic model (default, no key)
@@ -67,8 +69,9 @@ src/
       index.ts            Provider factory (RANKING_PROVIDER env)
     types.ts
   components/
-    GeoGrid.tsx           The heatmap + pin detail
-    theme.ts              Color tokens + rank color scale
+    GeoGrid.tsx           The heatmap + pin detail (+ baseline Δ-compare mode)
+    ScanLibrary.tsx       Saved-scan history, AMR trend chart, view/compare
+    theme.ts              Color tokens + rank/delta color scales
   data/
     seed.ts               Both locations, keywords (real GSC baselines), competitors
 ```
@@ -82,9 +85,12 @@ against Postgres (Neon or Vercel Postgres) before deploying there.
 
 ## Roadmap (port from the single-file prototype / build next)
 
+- ✅ **Scan library + comparison.** Every scan is archived; the dashboard lists
+  history per location/keyword with an AMR trend chart, loads any past scan, and
+  overlays a per-point Δ heatmap (improved/declined) against a chosen baseline.
 - **Auth + multi-tenant** (NextAuth + per-client workspaces) — required before
   this becomes a Make Ready offering for other print shops.
-- **Recurring scans** (cron) with scan-over-scan comparison.
+- **Recurring scans** (cron) to populate the library automatically.
 - **SERP tracker** and **AI-answer tracker** tabs.
 - **Review velocity** tracker (the gap calculator from the prototype).
 - **Shareable read-only report links** and white-label PDF export.

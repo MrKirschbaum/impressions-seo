@@ -3,6 +3,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { Grid3x3 } from "lucide-react";
 import type { Location, ScanResult } from "@/lib/types";
 import { GeoGrid } from "@/components/GeoGrid";
+import { ScanLibrary } from "@/components/ScanLibrary";
 import { T, mono } from "@/components/theme";
 
 const sel: CSSProperties = { background: T.panel, color: T.ink, border: `1px solid ${T.line}`, borderRadius: 8, padding: "9px 11px", fontSize: 13 };
@@ -14,6 +15,8 @@ export default function Dashboard() {
   const [kw, setKw] = useState("");
   const [size, setSize] = useState(7);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [baseline, setBaseline] = useState<ScanResult | null>(null);
+  const [historyKey, setHistoryKey] = useState(0); // bump to refetch the library
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,11 +44,33 @@ export default function Dashboard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Scan failed");
       setResult(data as ScanResult);
+      setHistoryKey((k) => k + 1); // newly saved scan appears in the library
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scan failed");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function fetchScan(id: string): Promise<ScanResult | null> {
+    try {
+      const res = await fetch(`/api/scans/${id}`);
+      if (!res.ok) return null;
+      return (await res.json()) as ScanResult;
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadScan(id: string) {
+    const scan = await fetchScan(id);
+    if (scan) { setResult(scan); setError(null); }
+  }
+
+  async function setBaselineById(id: string | null) {
+    if (!id) return setBaseline(null);
+    const scan = await fetchScan(id);
+    if (scan) setBaseline(scan);
   }
 
   return (
@@ -67,11 +92,12 @@ export default function Dashboard() {
             const l = locations.find((x) => x.id === e.target.value);
             setKw(l?.keywords[0]?.term ?? "");
             setResult(null);
+            setBaseline(null);
           }}>
           {locations.map((l) => <option key={l.id} value={l.id}>{l.name} &mdash; {l.address.split(",")[1]?.trim()}</option>)}
         </select>
 
-        <select value={kw} onChange={(e) => setKw(e.target.value)} style={{ ...sel, minWidth: 240 }} disabled={!loc?.keywords.length}>
+        <select value={kw} onChange={(e) => { setKw(e.target.value); setBaseline(null); }} style={{ ...sel, minWidth: 240 }} disabled={!loc?.keywords.length}>
           {loc?.keywords.length
             ? loc.keywords.map((k) => <option key={k.term} value={k.term}>{k.term}</option>)
             : <option>No keywords for this location</option>}
@@ -92,13 +118,25 @@ export default function Dashboard() {
       {error && <div style={{ color: T.red, fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
       {result ? (
-        <GeoGrid result={result} competitors={loc?.competitors ?? []} />
+        <GeoGrid result={result} competitors={loc?.competitors ?? []} baseline={baseline} />
       ) : (
         <div style={{ border: `1px dashed ${T.line}`, borderRadius: 10, padding: 32, textAlign: "center", color: T.sub, fontSize: 14 }}>
           {loc?.keywords.length
             ? "Pick a keyword and grid size, then run a scan to map your rank across the area."
             : "No keyword footprint for this location yet \u2014 wide open. Build reviews and location pages first."}
         </div>
+      )}
+
+      {kw && (
+        <ScanLibrary
+          locationId={locId}
+          keyword={kw}
+          refreshKey={historyKey}
+          currentId={result?.id ?? null}
+          baselineId={baseline?.id ?? null}
+          onView={loadScan}
+          onSetBaseline={setBaselineById}
+        />
       )}
 
       <div style={{ fontFamily: mono, fontSize: 11, color: T.faint, marginTop: 20 }}>

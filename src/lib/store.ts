@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { ScanResult } from "./types";
+import type { ScanResult, ScanSummary } from "./types";
 
 /**
  * JSON-file store — zero-config, great for local dev or self-hosting (Pi / VPS).
@@ -28,4 +28,27 @@ export async function saveScan(scan: ScanResult): Promise<void> {
 export async function listScans(locationId?: string): Promise<ScanResult[]> {
   const all = await readAll();
   return locationId ? all.filter((s) => s.locationId === locationId) : all;
+}
+
+/** Fetch one full scan (with points) by id — used to load a past scan into the viewer. */
+export async function getScan(id: string): Promise<ScanResult | null> {
+  const all = await readAll();
+  return all.find((s) => s.id === id) ?? null;
+}
+
+/**
+ * The history library: scan summaries (no points), newest first, optionally
+ * narrowed to a location and/or keyword. Cheap to send to the client.
+ */
+export async function listScanSummaries(
+  filter: { locationId?: string; keyword?: string } = {},
+): Promise<ScanSummary[]> {
+  const all = await readAll();
+  return all
+    .filter(
+      (s) =>
+        (!filter.locationId || s.locationId === filter.locationId) &&
+        (!filter.keyword || s.keyword === filter.keyword),
+    )
+    .map(({ points: _points, ...summary }) => summary);
 }

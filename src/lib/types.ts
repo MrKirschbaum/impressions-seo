@@ -34,3 +34,9 @@ export type ScanResult = {
   top3: number;  // % of points in top 3
   top10: number; // % of points in top 10
 };
+
+/**
+ * A scan without its (size^2) points — cheap to list for the history library.
+ * Carries everything the timeline and comparison picker need.
+ */
+export type ScanSummary = Omit<ScanResult, "points">;

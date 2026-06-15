@@ -15,3 +15,15 @@ export function rankColor(rank: number | null): string {
   if (rank <= 15) return "#EE8A2E";
   return "#E5532D";
 }
+
+/**
+ * Color a rank *change* between two scans. `delta` is improvement in rank
+ * positions (baseline rank − current rank), so positive = moved up the map.
+ */
+export function deltaColor(delta: number): string {
+  if (delta >= 5) return "#2FA86B";
+  if (delta > 0) return "#7CB342";
+  if (delta === 0) return "#6E655B";
+  if (delta > -5) return "#EE8A2E";
+  return "#E5532D";
+}
