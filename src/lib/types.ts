@@ -31,8 +31,15 @@ export type GridPoint = {
   lat: number; lng: number;
 };
 
-/** rank === null means the business was not found in the top 20 at this point. */
-export type RankedPoint = GridPoint & { rank: number | null };
+/** A business appearing in the local results at a point (ordered: index 0 = rank 1). */
+export type GridEntrant = { placeId?: string; name: string; isTarget?: boolean };
+
+/**
+ * rank === null means the business was not found in the top 20 at this point.
+ * `entrants` is the captured top-N ranked list at the point (competitor-capture
+ * layer) — absent on scans run before that layer existed.
+ */
+export type RankedPoint = GridPoint & { rank: number | null; entrants?: GridEntrant[] };
 
 export type ScanResult = {
   id: string;
@@ -128,4 +135,54 @@ export type AuditReport = {
   grade: string;   // A–F
   source: "live" | "derived"; // live = enriched from Places Details
   checks: AuditCheck[];
+};
+
+/* ─── Competitive landscape (from captured per-point entrants) ───────────── */
+
+/** How far from the storefront you hold a rank threshold (median rank ≤ K). */
+export type ReachRadius = {
+  top3Mi: number; top10Mi: number;
+  top3Km: number; top10Km: number;
+  gridRadiusMi: number; // distance to the outermost grid point (scan extent)
+};
+
+export type SolvEntry = {
+  name: string; placeId?: string; isTarget: boolean;
+  solv: number;        // 0..100 position-weighted local visibility
+  top3Share: number;   // % of cells where it sits in the top 3
+  appearances: number; // cells where it appears in the captured list
+  avgRank: number;     // mean rank where present
+};
+
+/** Who holds the #1 spot across the map. */
+export type KingEntry = { name: string; isTarget: boolean; cells: number; share: number };
+
+export type HeadToHead = {
+  name: string; placeId?: string;
+  wins: number; losses: number; ties: number;
+  winRate: number;            // % of contested cells you outrank them
+  yourReviews?: number; theirReviews?: number;
+};
+
+export type WinBlocker = { name: string; cells: number; reviews?: number; rating?: number };
+
+/** "What it takes to win" — closing top-3 in your weak zones. */
+export type WinModel = {
+  weakCells: number; totalCells: number;
+  blockers: WinBlocker[];
+  reviewThreshold?: number; targetReviews?: number; reviewGap?: number;
+  ratingThreshold?: number; targetRating?: number;
+  summary: string;
+};
+
+export type CompetitionReport = {
+  scanId: string; locationId: string; keyword: string; generatedAt: string;
+  totalPoints: number;
+  reach: ReachRadius;
+  hasCompetitors: boolean;    // false for pre-capture scans
+  shareOfNo1: number;         // target's % of #1 cells
+  kings: KingEntry[];
+  solv: SolvEntry[];
+  headToHead: HeadToHead[];
+  winModel: WinModel | null;
 };

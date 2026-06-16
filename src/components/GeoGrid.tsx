@@ -50,6 +50,10 @@ export function GeoGrid({
   const showDelta = comparable && view === "delta";
 
   const rivals = [...competitors].sort((a, b) => b.reviews - a.reviews);
+  const reviewsByName = (name: string) => {
+    const n = name.toLowerCase();
+    return competitors.find((c) => n.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(n))?.reviews;
+  };
 
   // Fit the grid into the map: center on the business, pick an integer zoom that
   // keeps every point within the padded square, then project each to a pixel.
@@ -197,14 +201,30 @@ export function GeoGrid({
               </div>
               {pin.rank === 1 ? (
                 <div style={{ color: T.good, fontSize: 13 }}>You own this point.</div>
-              ) : (
-                rivals.slice(0, Math.min(pin.rank == null ? 3 : pin.rank - 1, 3)).map((c, i) => (
+              ) : (() => {
+                // Prefer the businesses actually captured above you here; fall back to the seed list.
+                const above = (pin.entrants ?? [])
+                  .map((e, i) => ({ ...e, r: i + 1 }))
+                  .filter((e) => !e.isTarget && (pin.rank == null || e.r < pin.rank))
+                  .slice(0, 4);
+                if (above.length) {
+                  return above.map((e) => {
+                    const rev = reviewsByName(e.name);
+                    return (
+                      <div key={e.r} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "3px 0" }}>
+                        <span>#{e.r} {e.name}</span>
+                        {rev != null && <span style={{ color: T.sub }}>{rev} reviews</span>}
+                      </div>
+                    );
+                  });
+                }
+                return rivals.slice(0, Math.min(pin.rank == null ? 3 : pin.rank - 1, 3)).map((c, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "3px 0" }}>
                     <span>{i + 1}. {c.name}</span>
                     <span style={{ color: T.sub }}>{c.reviews} reviews</span>
                   </div>
-                ))
-              )}
+                ));
+              })()}
             </>
           ) : (
             <div style={{ color: T.sub, fontSize: 13, lineHeight: 1.6 }}>

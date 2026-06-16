@@ -66,6 +66,14 @@ function median(nums: number[]): number {
 const grade = (score: number) =>
   score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : score >= 60 ? "D" : "F";
 
+/** Merged GBP profile (config + cached live enrichment). Reused by the win-model. */
+export async function loadProfile(locationId: string, refresh = false): Promise<GbpProfile | null> {
+  const location = getLocation(locationId);
+  if (!location) return null;
+  const live = await fetchLiveProfile(location, refresh);
+  return { ...location.profile, ...(live ?? {}) };
+}
+
 /** Build the weighted GBP audit for a location. */
 export async function computeAudit(locationId: string, opts: { refresh?: boolean } = {}): Promise<AuditReport | null> {
   const location = getLocation(locationId);

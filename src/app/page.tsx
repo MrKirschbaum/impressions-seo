@@ -3,6 +3,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { Grid3x3, FileDown } from "lucide-react";
 import type { Location, ScanResult } from "@/lib/types";
 import { GeoGrid } from "@/components/GeoGrid";
+import { Competition } from "@/components/Competition";
 import { ScanLibrary } from "@/components/ScanLibrary";
 import { Rollup } from "@/components/Rollup";
 import { GbpAudit } from "@/components/GbpAudit";
@@ -126,7 +127,10 @@ export default function Dashboard() {
       {error && <div style={{ color: T.red, fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
       {result ? (
-        <GeoGrid result={result} competitors={loc?.competitors ?? []} baseline={baseline} />
+        <>
+          <GeoGrid result={result} competitors={loc?.competitors ?? []} baseline={baseline} />
+          <Competition scanId={result.id} />
+        </>
       ) : (
         <div style={{ border: `1px dashed ${T.line}`, borderRadius: 10, padding: 32, textAlign: "center", color: T.sub, fontSize: 14 }}>
           {loc?.keywords.length
