@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Crosshair } from "lucide-react";
 import type { Competitor, RankedPoint, ScanResult } from "@/lib/types";
 import { T, serif, rankColor, deltaColor } from "./theme";
@@ -25,6 +25,17 @@ function MetricDelta({ value, better }: { value: number; better: "up" | "down" }
   );
 }
 
+/* ── Web Mercator projection (matches Google Static/JS Maps) ────────────── */
+const TILE = 256;
+const projX = (lng: number) => TILE * (0.5 + lng / 360);
+const projY = (lat: number) => {
+  const s = Math.min(Math.max(Math.sin((lat * Math.PI) / 180), -0.9999), 0.9999);
+  return TILE * (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI));
+};
+
+const MAP_PX = 420; // square map side
+const PAD = 34;     // keep edge markers off the border
+
 export function GeoGrid({
   result, competitors, baseline,
 }: {
@@ -33,12 +44,34 @@ export function GeoGrid({
   baseline?: ScanResult | null;
 }) {
   const [pin, setPin] = useState<RankedPoint | null>(null);
+  const [mapFailed, setMapFailed] = useState(false);
   const comparable = !!baseline && baseline.size === result.size;
   const [view, setView] = useState<"rank" | "delta">("rank");
   const showDelta = comparable && view === "delta";
 
-  const SIDE = 380, pad = 18, cell = (SIDE - pad * 2) / result.size;
   const rivals = [...competitors].sort((a, b) => b.reviews - a.reviews);
+
+  // Fit the grid into the map: center on the business, pick an integer zoom that
+  // keeps every point within the padded square, then project each to a pixel.
+  const { center, zoom, place, radius, mapUrl } = useMemo(() => {
+    const c = result.points.find((p) => p.dx === 0 && p.dy === 0) ?? result.points[0];
+    const cx = projX(c.lng), cy = projY(c.lat);
+    let maxOff = 1e-9;
+    for (const p of result.points) {
+      maxOff = Math.max(maxOff, Math.abs(projX(p.lng) - cx), Math.abs(projY(p.lat) - cy));
+    }
+    const z = Math.max(1, Math.min(20, Math.floor(Math.log2((MAP_PX / 2 - PAD) / maxOff))));
+    const scale = 2 ** z;
+    const span = 2 * maxOff * scale;
+    const r = Math.max(6, Math.min(16, span / (result.size - 1) / 2 - 3));
+    return {
+      center: c,
+      zoom: z,
+      radius: r,
+      place: (p: RankedPoint) => ({ x: MAP_PX / 2 + (projX(p.lng) - cx) * scale, y: MAP_PX / 2 + (projY(p.lat) - cy) * scale }),
+      mapUrl: `/api/staticmap?lat=${c.lat}&lng=${c.lng}&zoom=${z}&size=${MAP_PX}`,
+    };
+  }, [result.points, result.size]);
 
   // Baseline rank by grid cell, for per-point comparison.
   const baseAt = new Map<string, number | null>();
@@ -52,41 +85,49 @@ export function GeoGrid({
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 14, alignItems: "start" }}>
-      <div style={{ ...card, padding: pad, width: SIDE + pad * 2 }}>
-        <svg width={SIDE} height={SIDE} style={{ display: "block" }}>
-          <defs>
-            <radialGradient id="bg" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#221d1a" />
-              <stop offset="100%" stopColor="#1a1613" />
-            </radialGradient>
-          </defs>
-          <rect width={SIDE} height={SIDE} rx="8" fill="url(#bg)" />
-          {[0.32, 0.62, 0.92].map((f, i) => (
-            <circle key={i} cx={SIDE / 2} cy={SIDE / 2} r={(SIDE / 2) * f} fill="none" stroke={T.line} strokeDasharray="3 4" />
-          ))}
-          {result.points.map((p, i) => {
-            const cx = pad + cell * (p.col + 0.5);
-            const cy = pad + cell * (p.row + 0.5);
-            const sel = pin?.row === p.row && pin?.col === p.col;
-            const center = p.dx === 0 && p.dy === 0;
-            const d = showDelta ? deltaOf(p) : null;
-            const fill = showDelta && d != null ? deltaColor(d) : rankColor(p.rank);
-            const label = showDelta
-              ? d == null ? "—" : d === 0 ? "0" : d > 0 ? `+${d}` : `${d}`
-              : p.rank == null ? "20+" : String(p.rank);
-            return (
-              <g key={i} onClick={() => setPin(p)} style={{ cursor: "pointer" }}>
-                <circle cx={cx} cy={cy} r={Math.min(cell / 2 - 3, 17)} fill={fill}
-                  stroke={sel ? "#fff" : center ? T.ink : "rgba(0,0,0,0.35)"}
-                  strokeWidth={sel ? 2.5 : center ? 2 : 1} opacity={p.rank == null && !showDelta ? 0.55 : 1} />
-                <text x={cx} y={cy + 4} textAnchor="middle" fontSize={showDelta ? "10" : "11"} fontWeight={700}
-                  fill={!showDelta && p.rank != null && p.rank <= 10 ? "#10100f" : "#fff"}>
-                  {label}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+      <div style={{ ...card, padding: 18, width: MAP_PX + 36 }}>
+        <div style={{ position: "relative", width: MAP_PX, height: MAP_PX, borderRadius: 8, overflow: "hidden", background: T.panel }}>
+          {/* Real map background (falls back to an abstract field if Static Maps is unavailable). */}
+          {mapFailed ? (
+            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 50%, #fafbfc 0%, #eceef2 100%)" }} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={mapUrl} alt="Service-area map" width={MAP_PX} height={MAP_PX}
+              onError={() => setMapFailed(true)}
+              style={{ display: "block", width: MAP_PX, height: MAP_PX, objectFit: "cover" }} />
+          )}
+
+          <svg width={MAP_PX} height={MAP_PX} style={{ position: "absolute", inset: 0 }}>
+            {result.points.map((p, i) => {
+              const { x, y } = place(p);
+              const sel = pin?.row === p.row && pin?.col === p.col;
+              const isCenter = p === center;
+              const d = showDelta ? deltaOf(p) : null;
+              const fill = showDelta && d != null ? deltaColor(d) : rankColor(p.rank);
+              const lightChip = !showDelta && p.rank != null && p.rank <= 10;
+              const label = showDelta
+                ? d == null ? "—" : d === 0 ? "0" : d > 0 ? `+${d}` : `${d}`
+                : p.rank == null ? "20+" : String(p.rank);
+              return (
+                <g key={i} onClick={() => setPin(p)} style={{ cursor: "pointer" }}>
+                  <circle cx={x} cy={y} r={radius + 1.5} fill="rgba(0,0,0,0.28)" />
+                  <circle cx={x} cy={y} r={radius} fill={fill}
+                    stroke={sel || isCenter ? T.ink : "rgba(255,255,255,0.85)"}
+                    strokeWidth={sel ? 2.5 : isCenter ? 2 : 1}
+                    opacity={p.rank == null && !showDelta ? 0.7 : 0.95} />
+                  <text x={x} y={y + 4} textAnchor="middle" fontSize={showDelta ? "10" : "11"} fontWeight={700}
+                    fill={lightChip ? "#10100f" : "#fff"}>
+                    {label}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        <div style={{ fontSize: 10, color: T.faint, marginTop: 8, fontFamily: "ui-monospace, Menlo, monospace", display: "flex", justifyContent: "space-between" }}>
+          <span>{center.lat.toFixed(4)}, {center.lng.toFixed(4)} · z{zoom}</span>
+          <span>{mapFailed ? "map unavailable — enable Maps Static API" : "Google Maps"}</span>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

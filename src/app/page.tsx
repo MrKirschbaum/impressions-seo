@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useState, type CSSProperties } from "react";
-import { Grid3x3 } from "lucide-react";
+import { Grid3x3, FileDown } from "lucide-react";
 import type { Location, ScanResult } from "@/lib/types";
 import { GeoGrid } from "@/components/GeoGrid";
 import { ScanLibrary } from "@/components/ScanLibrary";
+import { Rollup } from "@/components/Rollup";
+import { GbpAudit } from "@/components/GbpAudit";
+import { Monitoring } from "@/components/Monitoring";
 import { T, mono } from "@/components/theme";
 
 const sel: CSSProperties = { background: T.panel, color: T.ink, border: `1px solid ${T.line}`, borderRadius: 8, padding: "9px 11px", fontSize: 13 };
@@ -109,10 +112,15 @@ export default function Dashboard() {
           </button>
         ))}
 
-        <button onClick={runScan} disabled={loading || !kw} style={{ ...btn, background: T.ink, color: "#15120F", opacity: loading || !kw ? 0.5 : 1 }}>
+        <button onClick={runScan} disabled={loading || !kw} style={{ ...btn, background: T.ink, color: T.card, opacity: loading || !kw ? 0.5 : 1 }}>
           <Grid3x3 size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px" }} />
           {loading ? `Scanning ${size * size} points\u2026` : "Run scan"}
         </button>
+
+        <a href={`/report?loc=${locId}`} target="_blank" rel="noopener" title="Open a print-ready report (Save as PDF)"
+          style={{ ...btn, background: T.panel, color: T.sub, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+          <FileDown size={15} /> Export PDF
+        </a>
       </div>
 
       {error && <div style={{ color: T.red, fontSize: 13, marginBottom: 14 }}>{error}</div>}
@@ -127,17 +135,27 @@ export default function Dashboard() {
         </div>
       )}
 
-      {kw && (
-        <ScanLibrary
-          locationId={locId}
-          keyword={kw}
-          refreshKey={historyKey}
-          currentId={result?.id ?? null}
-          baselineId={baseline?.id ?? null}
-          onView={loadScan}
-          onSetBaseline={setBaselineById}
-        />
-      )}
+      <Rollup locationId={locId} refreshKey={historyKey} />
+
+      <GbpAudit locationId={locId} refreshKey={historyKey} />
+
+      <Monitoring
+        locations={locations}
+        locationId={locId}
+        keyword={kw}
+        onRun={() => setHistoryKey((k) => k + 1)}
+      />
+
+      <ScanLibrary
+        locations={locations}
+        locationId={locId}
+        keyword={kw}
+        refreshKey={historyKey}
+        currentId={result?.id ?? null}
+        baselineId={baseline?.id ?? null}
+        onView={loadScan}
+        onSetBaseline={setBaselineById}
+      />
 
       <div style={{ fontFamily: mono, fontSize: 11, color: T.faint, marginTop: 20 }}>
         Provider: {process.env.NEXT_PUBLIC_RANKING_PROVIDER ?? "mock"} &middot; each scan = {size * size} ranking lookups.

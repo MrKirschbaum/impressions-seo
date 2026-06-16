@@ -3,5 +3,7 @@
 @tailwind utilities;
 
 * { box-sizing: border-box; }
-html, body { margin: 0; background: #15120F; color: #F4EFE6; }
-select option { background: #1E1A16; }
+html, body { margin: 0; background: #F6F7F9; color: #16181D; }
+select option { background: #FFFFFF; }
+
+@keyframes spin { to { transform: rotate(360deg); } }

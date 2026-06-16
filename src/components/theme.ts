@@ -1,8 +1,9 @@
 export const T = {
-  bg: "#15120F", panel: "#1E1A16", card: "#262120", line: "#3A332E",
-  ink: "#F4EFE6", sub: "#A89E92", faint: "#6E655B",
-  red: "#E5322D", cyan: "#00A7E1", magenta: "#E5007E", yellow: "#FFCD00",
-  good: "#5BBF7B", warn: "#E8A93B",
+  // Light theme: clean neutral whites/grays, white cards on a near-white page.
+  bg: "#F6F7F9", panel: "#FBFBFC", card: "#FFFFFF", line: "#E5E7EB",
+  ink: "#16181D", sub: "#5B616E", faint: "#9CA3AF",
+  red: "#E5322D", cyan: "#0A7EA4", magenta: "#C8127E", yellow: "#C99A00",
+  good: "#1F9D55", warn: "#B8791A",
 };
 export const serif = "Georgia, 'Times New Roman', serif";
 export const mono = "ui-monospace, Menlo, monospace";
