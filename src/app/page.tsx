@@ -4,6 +4,7 @@ import { Grid3x3, FileDown } from "lucide-react";
 import type { Location, ScanResult } from "@/lib/types";
 import { GeoGrid } from "@/components/GeoGrid";
 import { Competition } from "@/components/Competition";
+import { PerformanceTrend } from "@/components/PerformanceTrend";
 import { ScanLibrary } from "@/components/ScanLibrary";
 import { Rollup } from "@/components/Rollup";
 import { GbpAudit } from "@/components/GbpAudit";
@@ -130,6 +131,13 @@ export default function Dashboard() {
         <>
           <GeoGrid result={result} competitors={loc?.competitors ?? []} baseline={baseline} />
           <Competition scanId={result.id} />
+          <PerformanceTrend
+            locationId={locId}
+            keyword={kw}
+            size={size}
+            refreshKey={historyKey}
+            currentId={result.id}
+          />
         </>
       ) : (
         <div style={{ border: `1px dashed ${T.line}`, borderRadius: 10, padding: 32, textAlign: "center", color: T.sub, fontSize: 14 }}>
